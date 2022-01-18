@@ -24,7 +24,7 @@ const randomColor = pickRandomColor();
 
 function ensureColorBoundary(code: number, step: number) {
   const sign = step > 0 ? 1 : -1;
-  return Math.max(Math.min(255, code + sign * Math.max(Math.abs(step), 1)), 0);
+  return Math.max(Math.min(255, code + sign * Math.max(Math.abs(step), 0)), 0);
 }
 
 const cc = new ContrastColor();
@@ -33,6 +33,9 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [matchedColor, setMatchedColor] = useState(randomColor);
   const [bgColor, setBgColor] = useState(randomColor.code);
+  const [commitedBgColor, setCommitedBgColor] = useState(randomColor.code);
+  const [adjusting, setAdjusting] = useState(false);
+  const [channelValueDiff, setChannelValueDiff] = useState(0);
   const currentColor = hexToRgb(bgColor);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState({name: ColorChannel.RED, value: currentColor.r});
@@ -53,7 +56,7 @@ export default function App() {
     }
     setSelectedChannel(prev => ({...prev, name: channel, value: val}))
   };
- 
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     wait(100).then(() => {
@@ -63,25 +66,27 @@ export default function App() {
       setRefreshing(false);
     });
   }, []);
- 
+
   useEffect(() => {
-    const currentColor = hexToRgb(bgColor);
+    if (!adjusting) return;
+    const currentColor = hexToRgb(commitedBgColor);
     const rgb = { ...currentColor };
     switch (selectedChannel.name) {
       case ColorChannel.RED:
-        rgb.r = selectedChannel.value;
+        rgb.r = ensureColorBoundary(rgb.r, channelValueDiff);
         break;
       case ColorChannel.GREEN:
-        rgb.g = selectedChannel.value;
+        rgb.g = ensureColorBoundary(rgb.g, channelValueDiff);
         break;
       case ColorChannel.BLUE:
-        rgb.b = selectedChannel.value;
+        rgb.b = ensureColorBoundary(rgb.b, channelValueDiff);
         break;
     }
+
     const colorCode = rgbToHex(rgb);
     setBgColor(colorCode);
     setMatchedColor(getMatchedColor(colorCode));
-  }, [bgColor, selectedChannel]);
+  }, [channelValueDiff, commitedBgColor, adjusting]);
 
   useEffect(() => {
     const getTutorialState = async () => {
@@ -98,6 +103,12 @@ export default function App() {
     };
     getTutorialState();
   }, []);
+
+  useEffect(() => {
+    if (!adjusting) {
+      setCommitedBgColor(bgColor);
+    }
+  }, [adjusting, bgColor])
 
   const onColorLongPress = () => {};
   const fgColor = cc.contrastColor({ bgColor });
@@ -117,10 +128,9 @@ export default function App() {
           styles.touchArea,
           { backgroundColor: bgColor },
         ])}
-        handleUpdate={diff => setSelectedChannel(prev => ({...prev, value: ensureColorBoundary(
-          prev.value,
-          diff
-        )}))}
+        onUpdate={setChannelValueDiff}
+        onStart={() => setAdjusting(true)}
+        onComplete={() => setAdjusting(false)}
         fgColor={fgColor}
       ></ChannelUpdator>
       {/* END: Main touch area */}
@@ -133,7 +143,7 @@ export default function App() {
           >
             {Object.values(hexToRgb(bgColor)).join(", ")}
           </Text>
-          {matchedColor && (
+          {!adjusting && matchedColor && (
             <Text
               style={StyleSheet.flatten([styles.colorName, { color: fgColor }])}
             >

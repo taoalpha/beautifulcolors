@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback} from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   Animated,
   Text,
@@ -15,28 +15,26 @@ import PanArea from "./PanArea";
 const windowWidth = Dimensions.get("window").width;
 const windowHeigth = Dimensions.get("window").height;
 
-function ensureColorBoundary(code: number, step: number) {
-  const sign = step > 0 ? 1 : -1;
-  return Math.max(Math.min(255, code + sign * Math.max(Math.abs(step), 1)), 0);
-}
-
 function getDiff(dx: number, dy: number) {
-  const diffPerct = Math.abs(dx) > Math.abs(dy) ? dx / windowWidth : -dy / windowHeigth;
+  const diffPerct =
+    Math.abs(dx) > Math.abs(dy) ? dx / windowWidth : -dy / windowHeigth;
   return Math.floor(diffPerct * 255);
 }
 
 const FINGER_SIZE_OFFSET = [-100, -50];
 
 export default function ChannelUpdator({
-  handleStarted = () => undefined,
-  handleUpdate = (value: number) => undefined,
+  onStart = () => undefined,
+  onComplete = () => undefined,
+  onUpdate = (value: number) => undefined,
   channel,
   style,
   fgColor,
 }: {
-  handleStarted?: () => void;
-  handleUpdate: (value: number) => void;
-  channel:  ColorChannel;
+  onStart?: () => void;
+  onComplete?: () => void;
+  onUpdate: (value: number) => void;
+  channel: ColorChannel;
   style: StyleProp<ViewStyle>;
   fgColor: string;
 }) {
@@ -56,27 +54,29 @@ export default function ChannelUpdator({
 
   const handlePanStarted = (gestureState: PanResponderGestureState) => {
     updateOffSet(gestureState);
-    handleStarted();
+    onStart();
     setAdjusting(true);
     return undefined;
   };
 
   const handlePanReleased = (gestureState: PanResponderGestureState) => {
-    handleUpdate(getDiff(gestureState.dx, gestureState.dy));
     setAdjusting(false);
+    onComplete();
     return undefined;
   };
 
   const handlePanMove = (gestureState: PanResponderGestureState) => {
+    const diff = getDiff(gestureState.dx, gestureState.dy);
     setDiff({
       x: gestureState.x0,
       y: gestureState.y0,
-      value: getDiff(gestureState.dx, gestureState.dy),
+      value: diff,
     });
     Animated.event([{ dx: touchPos.x, dy: touchPos.y }], {
       useNativeDriver: false,
     })(gestureState);
 
+    onUpdate(diff);
     updateOffSet(gestureState);
     return undefined;
   };
@@ -92,7 +92,9 @@ export default function ChannelUpdator({
         <Animated.View
           style={{ ...touchPos.getLayout(), position: "absolute" }}
         >
-          <Text style={StyleSheet.flatten([styles.tooltip, {color: fgColor}])}>
+          <Text
+            style={StyleSheet.flatten([styles.tooltip, { color: fgColor }])}
+          >
             Add {diff.value} to {channel}
           </Text>
         </Animated.View>

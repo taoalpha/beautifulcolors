@@ -175,7 +175,7 @@ export const BrandColors = {
   },
   android: { title: "Android", colors: ["a4c639"], brand_url: null },
   "angies-list": {
-    title: "Angie&#8217;s List",
+    title: "Angie's List",
     colors: ["7fbb00"],
     brand_url: null,
   },
@@ -302,7 +302,7 @@ export const BrandColors = {
     brand_url: "http://www.barclays.co.uk/",
   },
   "barnes-noble": {
-    title: "Barnes &#038; Noble",
+    title: "Barnes & Noble",
     colors: ["2a5934"],
     brand_url: "http://www.barnesandnoble.com/",
   },
@@ -659,7 +659,7 @@ export const BrandColors = {
     brand_url: "https://www.crunchbase.com/",
   },
   culvers: {
-    title: "Culver&#8217;s",
+    title: "Culver's",
     colors: ["005696"],
     brand_url: "http://www.culvers.com/",
   },
@@ -856,7 +856,7 @@ export const BrandColors = {
     brand_url: "https://www.docker.com/",
   },
   dominos: {
-    title: "Domino&#8217;s",
+    title: "Domino's",
     colors: ["0b648f", "e21737"],
     brand_url: "https://dominos.com/",
   },
@@ -1704,7 +1704,7 @@ export const BrandColors = {
     brand_url: null,
   },
   lloyds: {
-    title: "Lloyd&#8217;s",
+    title: "Lloyd's",
     colors: [
       "d81f2a",
       "ff9900",
@@ -1804,7 +1804,7 @@ export const BrandColors = {
     brand_url: "http://www.mastercard.us/",
   },
   mcdonalds: {
-    title: "McDonald&#8217;s",
+    title: "McDonald's",
     colors: [
       "bf0c0c",
       "e76a05",
@@ -2616,7 +2616,7 @@ export const BrandColors = {
     brand_url: "https://www.sage.com/",
   },
   sainsburys: {
-    title: "Sainsbury&#8217;s",
+    title: "Sainsbury's",
     colors: ["ec8a00"],
     brand_url: "http://www.j-sainsbury.co.uk/",
   },
@@ -3002,7 +3002,7 @@ export const BrandColors = {
     brand_url: "http://www.teslamotors.com/",
   },
   "texas-am-university": {
-    title: "Texas A&#038;M University",
+    title: "Texas AM University",
     colors: [
       "500000",
       "003c71",
@@ -3509,7 +3509,7 @@ export const BrandColors = {
     brand_url: "http://www.wechat.com/",
   },
   wendys: {
-    title: "Wendy&#8217;s",
+    title: "Wendy's",
     colors: ["e2203d", "199fda"],
     brand_url: "https://www.wendys.com/",
   },

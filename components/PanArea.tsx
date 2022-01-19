@@ -1,14 +1,14 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { Animated, PanResponder, PanResponderGestureState, StyleProp, ViewStyle } from "react-native";
 
 export default function PanArea({
   handlePanStarted = (gestureState: PanResponderGestureState) => undefined,
   handlePanMove = (gestureState: PanResponderGestureState) => undefined,
   handlePanReleased = (gestureState: PanResponderGestureState) => undefined,
-  children,
+  children = [],
   style,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   handlePanStarted: (gestureState: PanResponderGestureState) => void;
   handlePanMove: (gestureState: PanResponderGestureState) => void;

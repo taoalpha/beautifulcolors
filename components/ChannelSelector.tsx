@@ -1,123 +1,141 @@
-import React, {
-  useCallback,
-  useState,
-  useRef,
-  useEffect,
-  MutableRefObject,
-} from "react";
-import { AntDesign, Entypo } from "@expo/vector-icons";
+import React from "react";
+import { MaterialIcons } from "@expo/vector-icons";
 import {
   TouchableWithoutFeedback,
+  Platform,
   StyleSheet,
   Text,
   View,
-  ViewStyle,
 } from "react-native";
-
-export enum ColorChannel {
-  RED = "red",
-  GREEN = "green",
-  BLUE = "blue",
-}
-
-const ICON_SIZE = 32;
+import {
+  hexToRgb,
+  ColorChannel,
+} from "../lib/color";
 
 export default function ChannelSelector({
   selectedChannel,
-  channels,
+  canReset,
+  bgColor,
   fgColor,
-  style,
-  onChannelChange = (channel: ColorChannel) => undefined,
+  onColorReset, 
+  onColorRefresh, 
+  selectChannel,
 }: {
-  selectedChannel: ColorChannel;
-  channels: ColorChannel[];
+  selectedChannel: ColorChannel,
+  canReset: boolean,
+  bgColor: string;
   fgColor: string;
-  style: ViewStyle;
-  onChannelChange?: (channel: ColorChannel) => void;
+  onColorReset: () => void;
+  onColorRefresh: () => void;
+  selectChannel: (channel: ColorChannel) => void;
 }) {
-  const [channelSelectMode, setChannelSelectMode] = useState(false);
+  const onColorLongPress = () => {
+    // Support some actions like:
+    // 1. suggest name for a color
+  };
 
   return (
-    <View style={StyleSheet.flatten([styles.menuView, style])}>
-      {!channelSelectMode ? (
-        <TouchableWithoutFeedback
-          onPress={() => setChannelSelectMode(!channelSelectMode)}
-        >
-          <View
-            style={StyleSheet.flatten([
-              styles.channelView,
-              { borderColor: fgColor },
-            ])}
+    <TouchableWithoutFeedback onLongPress={onColorLongPress}>
+    <View style={styles.colorDisplayArea}>
+      <View style={styles.colorCodes}>
+        {Object.entries(hexToRgb(bgColor)).map(([channel, val], key) => (
+          <TouchableWithoutFeedback
+            key={key}
+            onPress={() => selectChannel(channel as ColorChannel)}
           >
-            <Text
-              style={StyleSheet.flatten([
-                styles.channelText,
-                { color: fgColor },
-              ])}
-            >
-              {selectedChannel.substring(0, 1).toUpperCase()}
-            </Text>
-          </View>
-        </TouchableWithoutFeedback>
-      ) : (
-        <>
-          {channels.map((channel, key) => (
-            <TouchableWithoutFeedback
-              key={key}
-              onPress={() => {
-                setChannelSelectMode(false);
-                onChannelChange(channel);
-              }}
-            >
-              <View
+            <View style={styles.colorCode}>
+              <Text
                 style={StyleSheet.flatten([
-                  styles.channelView,
+                  styles.colorCodeNameText,
                   {
-                    backgroundColor: channel,
-                    borderColor:
-                      channel === selectedChannel ? "white" : "black",
+                    color: channel === selectedChannel ? channel : fgColor,
                   },
                 ])}
               >
-                <Text
-                  style={StyleSheet.flatten([
-                    styles.channelText,
-                    channel === selectedChannel ? { color: "white" } : {},
-                  ])}
-                >
-                  {channel.substring(0, 1).toUpperCase()}
-                </Text>
-              </View>
-            </TouchableWithoutFeedback>
-          ))}
-          <TouchableWithoutFeedback onPress={() => setChannelSelectMode(false)}>
-            <AntDesign name="close" size={ICON_SIZE} color={fgColor} />
+                {channel.substring(0, 1)}
+              </Text>
+              <Text
+                style={StyleSheet.flatten([
+                  styles.colorCodeText,
+                  {
+                    color: channel === selectedChannel ? channel : fgColor,
+                  },
+                ])}
+              >
+                {val}
+              </Text>
+            </View>
           </TouchableWithoutFeedback>
-        </>
-      )}
+        ))}
+        <View style={styles.colorActionArea}>
+          <TouchableWithoutFeedback
+            onPress={onColorRefresh}
+          >
+            <MaterialIcons name="refresh" size={24} color={fgColor} />
+          </TouchableWithoutFeedback>
+          <TouchableWithoutFeedback
+            onPress={onColorReset}
+          >
+            <MaterialIcons
+              name="format-color-reset"
+              size={24}
+              color={fgColor}
+              style={{
+                opacity: canReset ? 1 : 0,
+              }}
+            />
+          </TouchableWithoutFeedback>
+        </View>
+      </View>
     </View>
+  </TouchableWithoutFeedback> 
   );
 }
 
 const styles = StyleSheet.create({
-  menuView: {
+  colorDisplayArea: {},
+  colorCodes: {
     display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    width: ICON_SIZE,
+    flexDirection: "row",
   },
-
-  channelView: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-    borderRadius: ICON_SIZE / 2,
-    borderWidth: 1,
+  colorCode: {
     display: "flex",
-    justifyContent: "center",
-    marginBottom: 8,
+    width: 100,
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+      },
+    }),
   },
-
-  channelText: {
+  colorCodeNameText: {
+    fontSize: 20,
     textAlign: "center",
+    textTransform: "uppercase",
+    ...Platform.select({
+      web: {
+        userSelect: "none",
+      },
+    }),
+  },
+  colorCodeText: {
+    fontSize: 40,
+    textAlign: "center",
+    textTransform: "uppercase",
+    ...Platform.select({
+      web: {
+        userSelect: "none",
+      },
+    }),
+  },
+  colorActionArea: {
+    display: "flex",
+    justifyContent: "space-around",
+    alignItems: "center",
+    ...Platform.select({
+      web: {
+        cursor: "pointer",
+        userSelect: "none",
+      },
+    }),
   },
 });

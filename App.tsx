@@ -1,26 +1,31 @@
-import React, { useCallback, useState, useRef, useEffect } from "react";
+import React, { useState, useLayoutEffect, useEffect } from "react";
+import Tooltip from "react-native-walkthrough-tooltip";
 import ContrastColor from "contrast-color";
 import { StatusBar } from "expo-status-bar";
 import {
-  TouchableWithoutFeedback,
+  StatusBar as RNStatusBar,
   SafeAreaView,
   Platform,
   StyleSheet,
   Text,
   View,
+  Linking,
+  TouchableHighlight,
 } from "react-native";
 import {
   pickRandomColor,
   getMatchedColor,
   rgbToHex,
   hexToRgb,
+  ColorChannel,
+  getChannelValue,
 } from "./lib/color";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { wait } from "./lib/timer";
-import ChannelSelector, { ColorChannel } from "./components/ChannelSelector";
 import ChannelUpdator from "./components/ChannelUpdator";
+import ChannelSelector from "./components/ChannelSelector";
 
-const randomColor = pickRandomColor();
+const initialRandomColor = pickRandomColor();
 
 function ensureColorBoundary(code: number, step: number) {
   const sign = step > 0 ? 1 : -1;
@@ -29,89 +34,84 @@ function ensureColorBoundary(code: number, step: number) {
 
 const cc = new ContrastColor();
 
+enum TutorialStep {
+  NONE,
+  WELCOME,
+  COLOR_DESC,
+  CHANNEL_SELECTOR,
+  DONE,
+}
+
 export default function App() {
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [randomColor, setRandomColor] = useState(initialRandomColor);
+  const [tutorialStep, setTutorial] = useState(TutorialStep.NONE);
   const [matchedColor, setMatchedColor] = useState(randomColor);
   const [bgColor, setBgColor] = useState(randomColor.code);
   const [commitedBgColor, setCommitedBgColor] = useState(randomColor.code);
   const [adjusting, setAdjusting] = useState(false);
   const [channelValueDiff, setChannelValueDiff] = useState(0);
-  const currentColor = hexToRgb(bgColor);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState({name: ColorChannel.RED, value: currentColor.r});
+  const [selectedChannel, setSelectedChannel] = useState(ColorChannel.RED);
 
-  const onNameChange = (channel: ColorChannel) => {
-    const currentColor = hexToRgb(bgColor);
-    let val = 0;
-    switch (channel) {
-      case ColorChannel.RED:
-        val = currentColor.r;
-        break;
-      case ColorChannel.GREEN:
-        val = currentColor.g;
-        break;
-      case ColorChannel.BLUE:
-        val = currentColor.b;
-        break;
+  // TODO: Consider moving to a custom hook.
+  // Commit the current bg color once adjusting finished.
+  useEffect(() => {
+    if (!adjusting) {
+      setCommitedBgColor(bgColor);
     }
-    setSelectedChannel(prev => ({...prev, name: channel, value: val}))
-  };
+  }, [adjusting, bgColor]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    wait(100).then(() => {
-      const randomColor = pickRandomColor();
-      setMatchedColor(randomColor);
-      setBgColor(randomColor.code);
-      setRefreshing(false);
-    });
-  }, []);
-
+  // Update bgColor based on adjusting progress.
   useEffect(() => {
     if (!adjusting) return;
     const currentColor = hexToRgb(commitedBgColor);
     const rgb = { ...currentColor };
-    switch (selectedChannel.name) {
-      case ColorChannel.RED:
-        rgb.r = ensureColorBoundary(rgb.r, channelValueDiff);
-        break;
-      case ColorChannel.GREEN:
-        rgb.g = ensureColorBoundary(rgb.g, channelValueDiff);
-        break;
-      case ColorChannel.BLUE:
-        rgb.b = ensureColorBoundary(rgb.b, channelValueDiff);
-        break;
-    }
+    rgb[selectedChannel] = ensureColorBoundary(
+      rgb[selectedChannel],
+      channelValueDiff
+    );
 
     const colorCode = rgbToHex(rgb);
     setBgColor(colorCode);
-    setMatchedColor(getMatchedColor(colorCode));
   }, [channelValueDiff, commitedBgColor, adjusting]);
 
   useEffect(() => {
+    setMatchedColor(getMatchedColor(commitedBgColor));
+  }, [commitedBgColor]);
+
+  useEffect(() => {}, [tutorialStep]);
+
+  // Run immediately after randomColor changed, to avoid mismatch between
+  // commitedBgColor and the new randomColor.
+  useLayoutEffect(() => {
+    setBgColor(randomColor.code);
+    setCommitedBgColor(randomColor.code);
+  }, [randomColor]);
+
+  // Show tutorial if user not yet seen them.
+  useEffect(() => {
     const getTutorialState = async () => {
-      const lastTimeSeenTutorial = await AsyncStorage.getItem("panTutorial");
-      if (lastTimeSeenTutorial === null) {
-        wait(2000)
-          .then(() => {
-            setShowTutorial(true);
-            AsyncStorage.setItem("panTutorial", `${Date.now()}`);
-            return wait(2000);
-          })
-          .then(() => setShowTutorial(false));
+      const bcTutorialInfo = await AsyncStorage.getItem("bcTutorial");
+      if (bcTutorialInfo === null) {
+        wait(1000).then(() => {
+          setTutorial(TutorialStep.WELCOME);
+          AsyncStorage.setItem(
+            "bcTutorial",
+            JSON.stringify({
+              lastSeen: `${Date.now()}`,
+              lastSeenStep: TutorialStep.COLOR_DESC,
+            })
+          );
+        });
       }
     };
     getTutorialState();
   }, []);
 
-  useEffect(() => {
-    if (!adjusting) {
-      setCommitedBgColor(bgColor);
-    }
-  }, [adjusting, bgColor])
-
-  const onColorLongPress = () => {};
   const fgColor = cc.contrastColor({ bgColor });
+
+  const hasColorValueChange = (channelValue: number, diff: number) => {
+    return (channelValue >= 0 && channelValue < 255 && diff > 0) || (channelValue > 0 && channelValue <= 255 && diff < 0);
+  }
 
   return (
     <SafeAreaView
@@ -123,7 +123,6 @@ export default function App() {
       <StatusBar style="auto" />
       {/* BEGIN: Main touch area */}
       <ChannelUpdator
-        channel={selectedChannel.name}
         style={StyleSheet.flatten([
           styles.touchArea,
           { backgroundColor: bgColor },
@@ -131,38 +130,117 @@ export default function App() {
         onUpdate={setChannelValueDiff}
         onStart={() => setAdjusting(true)}
         onComplete={() => setAdjusting(false)}
-        fgColor={fgColor}
       ></ChannelUpdator>
       {/* END: Main touch area */}
 
-      {/* BEGIN: Color display area */}
-      <TouchableWithoutFeedback onLongPress={onColorLongPress}>
-        <View style={styles.colorDisplayArea}>
-          <Text
-            style={StyleSheet.flatten([styles.colorCode, { color: fgColor }])}
+      {/* BEGIN: Color display and channel selector */}
+      <Tooltip
+        tooltipStyle={{ paddingBottom: 0 }}
+        isVisible={tutorialStep === TutorialStep.CHANNEL_SELECTOR}
+        content={
+          <View>
+            <Text>
+              Tap color channel to change selected channel, and slide
+              <Text style={{ fontWeight: "bold" }}> up/down </Text>or
+              <Text style={{ fontWeight: "bold" }}> right/left </Text>to adjust
+              the value.
+            </Text>
+          </View>
+        }
+        showChildInTooltip={false}
+        closeOnChildInteraction={false}
+        closeOnContentInteraction={false}
+        onClose={() => setTutorial(TutorialStep.DONE)}
+        placement="top"
+        // below is for the status bar of react navigation bar
+        topAdjustment={
+          Platform.OS === "android" && RNStatusBar.currentHeight
+            ? -RNStatusBar.currentHeight
+            : 0
+        }
+      >
+        <ChannelSelector
+          bgColor={bgColor}
+          fgColor={fgColor}
+          onColorRefresh={() => {
+            setRandomColor((c) => pickRandomColor([c.code]));
+          }}
+          onColorReset={() => {
+            setBgColor(randomColor.code);
+            setCommitedBgColor(randomColor.code);
+            setSelectedChannel(ColorChannel.RED);
+          }}
+          selectChannel={setSelectedChannel}
+          canReset={commitedBgColor !== randomColor.code}
+          selectedChannel={selectedChannel}
+        />
+      </Tooltip>
+      {/* END: Color display and channel selector */}
+      {/* BEGIN: Color description */}
+      {(!adjusting || !hasColorValueChange(getChannelValue(bgColor, selectedChannel), channelValueDiff)) && matchedColor && (
+        <View style={styles.colorDescArea}>
+          <Tooltip
+            tooltipStyle={{ paddingBottom: 0 }}
+            isVisible={tutorialStep === TutorialStep.COLOR_DESC}
+            content={
+              <View>
+                <Text>
+                  {" "}
+                  A short description of the color if it matches one of the
+                  pre-defined colors.{" "}
+                </Text>
+              </View>
+            }
+            showChildInTooltip={false}
+            closeOnChildInteraction={false}
+            closeOnContentInteraction={false}
+            onClose={() => setTutorial(TutorialStep.CHANNEL_SELECTOR)}
+            placement="top"
+            // below is for the status bar of react navigation bar
+            topAdjustment={
+              Platform.OS === "android" && RNStatusBar.currentHeight
+                ? -RNStatusBar.currentHeight
+                : 0
+            }
           >
-            {Object.values(hexToRgb(bgColor)).join(", ")}
-          </Text>
-          {!adjusting && matchedColor && (
             <Text
-              style={StyleSheet.flatten([styles.colorName, { color: fgColor }])}
+              style={StyleSheet.flatten([
+                styles.colorDescText,
+                { color: fgColor },
+              ])}
             >
               {matchedColor.desc.map((d) => d.title).join(",")}
             </Text>
-          )}
+          </Tooltip>
         </View>
-      </TouchableWithoutFeedback>
-      {/* END: Color display area */}
-
-      {/* BEGIN: channel selector */}
-      <ChannelSelector
-        selectedChannel={selectedChannel.name}
-        onChannelChange={onNameChange}
-        style={styles.channelSelector}
-        fgColor={cc.contrastColor({ bgColor })}
-        channels={[ColorChannel.RED, ColorChannel.GREEN, ColorChannel.BLUE]}
+      )}
+      {/* END: Color description */}
+      {/* BEGIN: Welcome tutorial */}
+      <Tooltip
+        tooltipStyle={{ paddingBottom: 0 }}
+        isVisible={tutorialStep === TutorialStep.WELCOME}
+        content={
+          <View>
+            <Text>
+              Welcome to Beautiful Colors! This tutorial will walk you through how to use it.
+            </Text>
+            {/* <TouchableHighlight onPress={() => Linking.openURL('https://github.com/taoalpha')}> */}
+              {/* <Text style={{color: 'blue'}}>Github</Text> */}
+            {/* </TouchableHighlight> */}
+          </View>
+        }
+        closeOnChildInteraction={false}
+        closeOnContentInteraction={false}
+        onClose={() => setTutorial(TutorialStep.COLOR_DESC)}
+        placement="top"
+        // below is for the status bar of react navigation bar
+        topAdjustment={
+          Platform.OS === "android" && RNStatusBar.currentHeight
+            ? -RNStatusBar.currentHeight
+            : 0
+        }
       />
-      {/* END: channel selector */}
+      {/* END: Welcome tutorial */}
     </SafeAreaView>
   );
 }
@@ -186,31 +264,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  colorDisplayArea: {},
-  colorName: {
-    fontSize: 30,
-    ...Platform.select({
-      web: {
-        userSelect: "none",
-      },
-    }),
-  },
-  colorCode: {
-    fontSize: 40,
-    textTransform: "uppercase",
-    ...Platform.select({
-      web: {
-        userSelect: "none",
-      },
-    }),
-  },
-  channelSelector: {
+  colorDescArea: {
     position: "absolute",
     bottom: 20,
-    right: 20,
+  },
+  colorDescText: {
+    fontSize: 16,
+    textAlign: "center",
     ...Platform.select({
       web: {
-        cursor: "pointer",
+        userSelect: "none",
       },
     }),
   },
